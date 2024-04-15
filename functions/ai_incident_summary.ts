@@ -3,7 +3,7 @@ import OpenAI from "openai/mod.ts";
 
 export const GenerateAIIncidentSummary = DefineFunction({
   callback_id: "ai_incident_summary",
-  title: "genereate a summary of an incident",
+  title: "generate a summary of an incident",
   description: "Check internal database for a user's mobile information.",
   source_file: "functions/ai_incident_summary.ts",
   input_parameters: {
@@ -47,23 +47,53 @@ export default SlackFunction(
       console.error(error);
     }
 
-    const openai = new OpenAI({
-      apiKey: env.OPENAI_API_KEY,
-    });
+    let OPEN_AI;
+    let completionContent = "";
+    try {
+      OPEN_AI = new OpenAI({
+        apiKey: env.OPENAI_API_KEY,
+      });
 
-    const chatCompletion = await openai.chat.completions.create({
-      messages: [
-        {
-          "role": "system",
-          "content":
-            `You are a helpful assistant. Please write a response to the following email in 100 words:`,
-        },
-        { "role": "user", "content": `${original_message_text}` },
-      ],
-      model: "gpt-3.5-turbo",
-    });
+      const chatCompletion = await OPEN_AI.chat.completions.create({
+        messages: [
+          {
+            "role": "system",
+            "content":
+              ` summarize the incident and provide answers to the following: 
+              Incident Summary:
 
-    const completionContent = chatCompletion.choices[0].message.content;
+              Incident Date:
+              Incident ID:
+              Reported by:
+              Severity level:
+              Status:
+              📝 Incident Description:
+              
+              What happened? Explain in detail...
+              🦷 Root Cause Analysis:
+              
+              Cause:
+              Impact:
+              Resolution:
+              👍 What Went Well?
+              
+              Item 1
+              Item 2
+              👎 What Could Have Gone Better?
+              
+              Item 1
+              Item 2
+              Item 3`,
+          },
+          { "role": "user", "content": `${original_message_text}` },
+        ],
+        model: "gpt-3.5-turbo",
+      });
+      completionContent = chatCompletion.choices[0].message.content || "null";
+      console.log("completionContent=========>", completionContent);
+    } catch (error) {
+      console.error(error);
+    }
 
     return {
       outputs: {},
