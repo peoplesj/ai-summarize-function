@@ -23,34 +23,38 @@ export const GenerateAIIncidentSummary = DefineFunction({
     properties: {
       ai_incident_summary: {
         type: Schema.types.string,
-        description: "an ai summary of the incident",
+        description: "An ai summary of the incident",
+      },
+      ai_incident_canvas_title: {
+        type: Schema.types.string,
+        description: "A title for the incident",
       },
     },
-    required: [],
+    required: ["ai_incident_summary", "ai_incident_canvas_title"],
   },
 });
 
 export default SlackFunction(
   GenerateAIIncidentSummary,
   async ({ client, inputs, env }) => {
-    let original_message_text = "";
+    let originalMessage = "";
+    let AIIncidentSummary = "";
+    let canvasTitle = "";
     try {
-      const historyResponse = await client.conversations.history({
+      const messageHistoryResponse = await client.conversations.history({
         channel: inputs.channel_id,
         oldest: inputs.timestamp_of_original_message,
         inclusive: true,
         limit: 1,
       });
-      original_message_text = historyResponse.messages[0].text;
-      console.log("email text=======>", original_message_text);
+      originalMessage = messageHistoryResponse.messages[0].text;
+      console.log("Original message:", originalMessage);
     } catch (error) {
-      console.error(error);
+      console.error("trying: client.conversations.history", error);
     }
 
-    let OPEN_AI;
-    let completionContent = "";
     try {
-      OPEN_AI = new OpenAI({
+      const OPEN_AI = new OpenAI({
         apiKey: env.OPENAI_API_KEY,
       });
 
@@ -59,7 +63,8 @@ export default SlackFunction(
           {
             "role": "system",
             "content":
-              ` summarize the incident and provide answers to the following: 
+              `summarize the incident and provide answers to the following. Note that the following template format is mandatory: 
+              Incident Title:
               Incident Summary:
 
               Incident Date:
@@ -85,18 +90,34 @@ export default SlackFunction(
               Item 2
               Item 3`,
           },
-          { "role": "user", "content": `${original_message_text}` },
+          { "role": "user", "content": `${originalMessage}` },
         ],
         model: "gpt-3.5-turbo",
       });
-      completionContent = chatCompletion.choices[0].message.content || "null";
-      console.log("completionContent=========>", completionContent);
+      AIIncidentSummary = chatCompletion.choices[0].message.content ?? "null";
+
+      // Regex: match for title, grab all letters until new line / case insensitive
+      const titleRegex = /title: (.+)/i;
+      const regexMatch = AIIncidentSummary.match(titleRegex);
+
+      if (regexMatch && regexMatch.length > 1) {
+        canvasTitle = regexMatch[1];
+        console.log("Regex matched Title:", canvasTitle);
+      } else {
+        const uniqueTimestamp = Date.now();
+        canvasTitle = `Incident Summary: ${uniqueTimestamp}`;
+        console.log("Title not found in the text.");
+      }
+      console.log("AIIncidentSummary:", AIIncidentSummary);
     } catch (error) {
-      console.error(error);
+      console.error("trying: OPEN_AI.chat.completions.create", error);
     }
 
     return {
-      outputs: {},
+      outputs: {
+        ai_incident_canvas_title: canvasTitle,
+        ai_incident_summary: AIIncidentSummary,
+      },
     };
   },
 );
