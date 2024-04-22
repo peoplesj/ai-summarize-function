@@ -55,7 +55,7 @@ export default SlackFunction(
 
     try {
       const OPEN_AI = new OpenAI({
-        apiKey: env.OPENAI_API_KEY,
+        apiKey: "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",
       });
 
       const chatCompletion = await OPEN_AI.chat.completions.create({
